@@ -1,0 +1,180 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { getServerSession } from 'next-auth';
+import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { prisma } from '@/lib/prisma';
+import { generatePromptPlaceholder } from '@/utils/placeholderImage';
+
+/**
+ * GET /api/prompts/feed
+ * Returns prompts from users that the current user follows
+ */
+export async function GET(request: NextRequest) {
+  try {
+    // Check authentication
+    const session = await getServerSession(authOptions);
+    if (!session || !session.user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const userId = session.user.id;
+    const searchParams = request.nextUrl.searchParams;
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '20', 10);
+    const category = searchParams.get('category');
+
+    // Get users that the current user follows
+    const following = await prisma.follow.findMany({
+      where: { followerId: userId },
+      select: { followingId: true }
+    });
+
+    const followingIds = following.map(follow => follow.followingId);
+
+    // If the user doesn't follow anyone, return empty array
+    if (followingIds.length === 0) {
+      return NextResponse.json({
+        prompts: [],
+        pagination: {
+          page,
+          pageSize,
+          total: 0,
+          totalPages: 0
+        },
+        followsUsers: false
+      });
+    }
+
+    // Build the where conditions
+    const whereConditions: any = {
+      userId: { in: followingIds }
+    };
+    
+    // Filter by category if provided
+    if (category) {
+      // Check if category is an ID or a name
+      const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(category);
+      
+      if (isUUID) {
+        // Filter by category ID
+        whereConditions.categoryId = category;
+      } else {
+        // Filter by category name
+        whereConditions.category = {
+          name: {
+            contains: category
+          }
+        };
+      }
+    }
+
+    // Get total count for pagination
+    const totalPrompts = await prisma.prompt.count({
+      where: whereConditions
+    });
+
+    // Get prompts from users that the current user follows
+    const prompts = await prisma.prompt.findMany({
+      where: whereConditions,
+      include: {
+        user: {
+          select: {
+            id: true,
+            name: true,
+            image: true
+          }
+        },
+        category: true,
+        ratings: {
+          select: {
+            rating: true
+          }
+        },
+        _count: {
+          select: {
+            ratings: true
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+      skip: (page - 1) * pageSize,
+      take: pageSize
+    });
+
+    // Get saved prompts by the current user
+    const savedPrompts = await prisma.savedPrompt.findMany({
+      where: { userId },
+      select: { promptId: true }
+    });
+    
+    const savedPromptIds = savedPrompts.map(sp => sp.promptId);
+
+    // Format prompts for response
+    const formattedPrompts = prompts.map(prompt => {
+      // Calculate average rating
+      let averageRating = 0;
+      if (prompt.ratings && prompt.ratings.length > 0) {
+        const totalRating = prompt.ratings.reduce((sum, r) => sum + r.rating, 0);
+        averageRating = totalRating / prompt.ratings.length;
+      }
+      
+      // Parse tags from JSON string
+      let tags: string[] = [];
+      if (prompt.tags) {
+        try {
+          tags = JSON.parse(prompt.tags as string);
+        } catch (e) {
+          console.error('Error parsing tags:', e);
+        }
+      }
+      
+      // Check if saved
+      const isSaved = savedPromptIds.includes(prompt.id);
+      
+      // Generate a placeholder image if none exists
+      const imageUrl = prompt.image || generatePromptPlaceholder(
+        prompt.title,
+        prompt.user.name,
+        tags
+      );
+      
+      return {
+        id: prompt.id,
+        title: prompt.title,
+        description: prompt.description,
+        promptText: prompt.promptText,
+        exampleOutputs: prompt.exampleOutputs,
+        image: imageUrl,
+        userId: prompt.userId,
+        userName: prompt.user.name,
+        userImage: prompt.user.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(prompt.user.name)}&background=random`,
+        createdAt: prompt.createdAt.toISOString(),
+        tags: tags,
+        categoryId: prompt.categoryId,
+        categoryName: prompt.category?.name,
+        categoryImage: prompt.category?.image,
+        rating: averageRating,
+        numRatings: prompt._count?.ratings || 0,
+        suggestedModel: prompt.suggestedModel,
+        isSaved
+      };
+    });
+
+    return NextResponse.json({
+      prompts: formattedPrompts,
+      pagination: {
+        page,
+        pageSize,
+        total: totalPrompts,
+        totalPages: Math.ceil(totalPrompts / pageSize)
+      },
+      followsUsers: true
+    });
+    
+  } catch (error) {
+    console.error("Error fetching feed prompts:", error);
+    return NextResponse.json(
+      { error: "Failed to load feed" },
+      { status: 500 }
+    );
+  }
+}

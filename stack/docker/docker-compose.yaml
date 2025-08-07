@@ -1,0 +1,54 @@
+services:
+  app:
+    build:
+      context: ../../app
+      dockerfile: ../stack/docker/app/Dockerfile
+    container_name: promptly-nextjs
+    ports:
+      - "3000:3000"
+    volumes:
+      - ../../app:/app
+      - /app/node_modules  # This prevents the node_modules from being overwritten by the bind mount
+    environment:
+      - NODE_ENV=development
+      - NEXTAUTH_URL=http://localhost:3000
+      - NEXTAUTH_SECRET=7d7103809203c46bfc06115b9fc5ba34  # A randomly generated secure value
+      # Database connection
+      - DATABASE_URL=mysql://promptly:promptlypass@db:3306/promptly
+    restart: unless-stopped
+    command: npm run dev
+    depends_on:
+      - db
+      
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin
+    container_name: promptly-phpmyadmin
+    ports:
+      - "8080:80"
+    environment:
+      - PMA_HOST=db
+      - PMA_PORT=3306
+      - PMA_USER=promptly
+      - PMA_PASSWORD=promptlypass
+      - MYSQL_ROOT_PASSWORD=rootpassword
+    depends_on:
+      - db
+    restart: unless-stopped
+  
+  db:
+    image: mysql:8.0
+    container_name: promptly-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+      - ./data/db_init:/docker-entrypoint-initdb.d
+    environment:
+      - MYSQL_ROOT_PASSWORD=rootpassword
+      - MYSQL_DATABASE=promptly
+      - MYSQL_USER=promptly
+      - MYSQL_PASSWORD=promptlypass
+    command: --default-authentication-plugin=mysql_native_password
+    cap_add:
+      - SYS_NICE  # CAP_SYS_NICE to avoid MySQL warnings
