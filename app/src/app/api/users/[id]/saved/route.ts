@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { parseTags } from "@/utils/format";
 
 // API endpoint to get a user's saved prompts
 export async function GET(
@@ -120,14 +121,7 @@ export async function GET(
       const averageRating = prompt.ratings.length > 0 ? totalRating / prompt.ratings.length : 0;
       
       // Extract tags from JSON string if available
-      let tags: string[] = [];
-      if (prompt.tags) {
-        try {
-          tags = JSON.parse(prompt.tags);
-        } catch (e) {
-          console.error('Error parsing tags:', e);
-        }
-      }
+  const tags = parseTags(prompt.tags);
       
       // Format category
       const categoryName = prompt.category?.name || null;

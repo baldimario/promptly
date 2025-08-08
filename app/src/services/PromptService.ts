@@ -67,22 +67,39 @@ export class PromptService {
   static async list(options: {
     currentUserId?: string | null;
     userId?: string | null;
+    userIds?: string[] | null;
     categoryId?: string | null;
     q?: string | null;
-    sort?: 'recent' | 'trending';
+    sort?: 'recent' | 'trending' | 'oldest';
     page?: number;
     pageSize?: number;
   }) {
-    const { currentUserId, userId, categoryId, q, sort = 'recent', page = 1, pageSize = 20 } = options;
+    const { currentUserId, userId, userIds, categoryId, q, sort = 'recent', page = 1, pageSize = 20 } = options;
 
     const where: any = {};
-    if (userId) where.userId = userId;
+    if (userIds && Array.isArray(userIds) && userIds.length > 0) {
+      where.userId = { in: userIds };
+    } else if (userId) {
+      where.userId = userId;
+    }
     if (categoryId) where.categoryId = categoryId;
-    if (q) where.OR = [{ title: { contains: q } }, { description: { contains: q } }];
+    if (q) {
+      // Search across title, description, promptText and tags JSON string
+      where.OR = [
+        { title: { contains: q } },
+        { description: { contains: q } },
+        { promptText: { contains: q } },
+        { tags: { contains: q } },
+      ];
+    }
 
     const total = await prisma.prompt.count({ where });
     const orderBy: any =
-      sort === 'trending' ? { ratings: { _count: 'desc' as const } } : { createdAt: 'desc' as const };
+      sort === 'trending'
+        ? { ratings: { _count: 'desc' as const } }
+        : sort === 'oldest'
+        ? { createdAt: 'asc' as const }
+        : { createdAt: 'desc' as const };
 
     const prompts = await prisma.prompt.findMany({
       where,
@@ -124,6 +141,7 @@ export class PromptService {
         userId: p.userId,
         userName: p.user?.name || 'Unknown',
         userImage: avatarUrl(p.user?.name || 'Unknown', p.user?.image || null),
+        user: { id: p.userId, name: p.user?.name || 'Unknown', image: p.user?.image || null },
         createdAt: p.createdAt.toISOString(),
         tags,
         categoryId: p.categoryId || undefined,
@@ -132,6 +150,7 @@ export class PromptService {
         rating: avg,
         averageRating: avg,
         numRatings: p._count?.ratings || 0,
+        _count: { ratings: p._count?.ratings || 0 },
         suggestedModel: (p as any).suggestedModel,
         isSaved: currentUserId ? savedIds.includes(p.id) : false,
       };
