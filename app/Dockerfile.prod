@@ -27,6 +27,8 @@ RUN npm ci --omit=dev
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
+# Ensure uploads directory exists in the image
+RUN mkdir -p /app/public/uploads/images && chown -R nextjs:nodejs /app/public/uploads
 EXPOSE 3000
 USER nextjs
 CMD ["npm","run","start"]
