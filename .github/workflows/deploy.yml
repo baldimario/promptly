@@ -1,0 +1,42 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Copy files to VPS
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avz --delete
+          path: .
+          remote_path: ${{ secrets.VPS_APP_PATH }}
+          remote_host: ${{ secrets.VPS_HOST }}
+          remote_user: ${{ secrets.VPS_USER }}
+
+      - name: Build and restart containers
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+          cd ${{ secrets.VPS_APP_PATH }}/stack/docker
+          export NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+          export NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+          export DATABASE_URL=${{ secrets.DATABASE_URL }}
+          export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          export MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
+          export MYSQL_USER=${{ secrets.MYSQL_USER }}
+          export MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          docker compose -f docker-compose.prod.yaml down
+          docker compose -f docker-compose.prod.yaml build --no-cache
+          docker compose -f docker-compose.prod.yaml up -d --remove-orphans
+          EOF

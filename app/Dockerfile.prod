@@ -1,0 +1,32 @@
+FROM node:lts-alpine3.22 AS deps
+WORKDIR /app
+RUN apk add --no-cache libc6-compat openssl
+COPY package.json package-lock.json* ./
+# Install ALL deps (including dev) for build tooling like Tailwind/PostCSS
+RUN npm ci
+
+FROM node:lts-alpine3.22 AS builder
+WORKDIR /app
+RUN apk add --no-cache openssl
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npx prisma generate
+ENV NEXT_TELEMETRY_DISABLED=1
+RUN npm run build
+
+FROM node:lts-alpine3.22 AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -G nodejs -u 1001
+# Install only production deps for runtime
+COPY --from=builder /app/package.json ./package.json
+COPY --from=builder /app/package-lock.json ./package-lock.json
+RUN npm ci --omit=dev
+COPY --from=builder /app/.next ./.next
+COPY --from=builder /app/public ./public
+COPY --from=builder /app/prisma ./prisma
+EXPOSE 3000
+USER nextjs
+CMD ["npm","run","start"]

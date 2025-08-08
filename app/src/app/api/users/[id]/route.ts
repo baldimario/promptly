@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
 // API endpoint to get a user's profile
 export async function GET(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ) {
   try {
     // Await params properly before accessing properties
-    const resolvedParams = await Promise.resolve(params);
+    const resolvedParams = await Promise.resolve((context?.params || {}) as { id: string });
     const { id: userId } = resolvedParams;
     
     if (!userId) {

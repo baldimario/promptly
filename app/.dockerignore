@@ -7,6 +7,7 @@ yarn-error.log
 
 # Next.js build output
 .next
+.next/cache
 out
 
 # Misc
@@ -26,8 +27,5 @@ out
 .idea
 .vscode
 
-# Build files
+# Build files (keep Dockerfile and .dockerignore in context for multi-stage if needed)
 README.md
-Dockerfile
-.dockerignore
-docker-compose.yaml

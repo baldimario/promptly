@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../auth/[...nextauth]/route';
+import { authOptions } from '@/lib/authOptions';
+import { AuthService } from '@/services/AuthService';
 import { prisma } from '@/lib/prisma';
-import { readdirSync } from 'fs';
-import path from 'path';
-import { uploadToCloudinary } from '@/lib/cloudinary';
+import { PromptService } from '@/services/PromptService';
+import { avatarUrl } from '@/utils/format';
 
 // Define the expected type for the prompt response
 interface PromptWithRelations {
@@ -52,160 +52,17 @@ interface PromptWithRelations {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ) {
   try {
-    // Get user session to check if prompt is saved
-    const session = await getServerSession(authOptions);
-    const userId = session?.user?.id;
-    
-    // Ensure params is awaited properly
-    const resolvedParams = await Promise.resolve(params);
-    const { id } = resolvedParams;
-    
-    // Find prompt in database
-    const prompt = await prisma.prompt.findUnique({
-      where: { id },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            image: true
-          }
-        },
-        category: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            description: true
-          }
-        },
-        ratings: {
-          select: {
-            rating: true
-          }
-        },
-        comments: {
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-                image: true
-              }
-            }
-          },
-          orderBy: {
-            createdAt: 'desc'
-          }
-        },
-        _count: {
-          select: {
-            ratings: true
-          }
-        }
-      }
-    }) as unknown as PromptWithRelations;
-    
-    // If prompt not found
-    if (!prompt) {
-      return NextResponse.json(
-        { error: 'Prompt not found' },
-        { status: 404 }
-      );
-    }
-    
-    // Calculate average rating
-    const totalRating = prompt.ratings.reduce((sum: number, rating: { rating: number }) => sum + rating.rating, 0);
-    const averageRating = prompt.ratings.length > 0 ? totalRating / prompt.ratings.length : 0;
-    
-    // Parse tags from JSON string
-    let tags: string[] = [];
-    if (prompt.tags) {
-      try {
-        tags = JSON.parse(prompt.tags as string);
-      } catch (e) {
-        console.error('Error parsing tags:', e);
-      }
-    }
-    
-    // Look for additional images with the same prompt ID pattern
-    let imageUrls: string[] = [];
-    try {
-      const promptIdPrefix = prompt.id;
-      const uploadsDir = path.join(process.cwd(), 'public', 'uploads', 'images');
-      
-      // Try to read the directory
-      try {
-        const files = readdirSync(uploadsDir);
-        // Filter files that might contain the prompt ID in their name
-        imageUrls = files
-          .filter(file => file.includes(promptIdPrefix))
-          .map(file => `/uploads/images/${file}`);
-      } catch (error) {
-        console.error('Error reading uploads directory:', error);
-      }
-      
-      // If no images found but prompt has a main image, include it
-      if (imageUrls.length === 0 && prompt.image) {
-        imageUrls = [prompt.image];
-      }
-    } catch (error) {
-      console.error('Error finding additional images:', error);
-    }
-    
-    // Format comments
-    const formattedComments = prompt.comments.map(comment => ({
-      id: comment.id,
-      userId: comment.userId,
-      userName: comment.user.name,
-      userImage: comment.user.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(comment.user.name)}&background=random`,
-      text: comment.text,
-      createdAt: comment.createdAt.toISOString()
-    }));
-    
-    // Check if the prompt is saved by current user
-    let isSaved = false;
-    if (userId) {
-      const savedPrompt = await prisma.savedPrompt.findUnique({
-        where: {
-          userId_promptId: {
-            userId,
-            promptId: id
-          }
-        }
-      });
-      
-      isSaved = !!savedPrompt;
-    }
-    
-    // Format the prompt response
-    const formattedPrompt = {
-      id: prompt.id,
-      title: prompt.title,
-      description: prompt.description,
-      promptText: prompt.promptText,
-      exampleOutputs: prompt.exampleOutputs,
-      suggestedModel: prompt.suggestedModel,
-      image: prompt.image,
-      imageUrls,
-      userId: prompt.userId,
-      userName: prompt.user?.name || 'Unknown',
-      userImage: prompt.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(prompt.user?.name || 'Unknown')}&background=random`,
-      createdAt: prompt.createdAt.toISOString(),
-      ratings: averageRating,
-      numRatings: prompt._count?.ratings || 0,
-      comments: formattedComments,
-      categoryId: prompt.categoryId,
-      categoryName: prompt.category?.name,
-      categoryImage: prompt.category?.image,
-      tags: tags,
-      isSaved: isSaved
-    };
-    
-    return NextResponse.json({ prompt: formattedPrompt });
+  const session = await getServerSession(authOptions);
+  const currentUserId = session?.user?.id ?? null;
+  const { id } = await Promise.resolve(context?.params || {} as { id: string });
+
+  const prompt = await PromptService.getById(id, currentUserId);
+  if (!prompt) return NextResponse.json({ error: 'Prompt not found' }, { status: 404 });
+
+  return NextResponse.json({ prompt });
   } catch (error) {
     console.error('Error fetching prompt:', error);
     return NextResponse.json(
@@ -218,7 +75,7 @@ export async function GET(
 // POST - Add a comment or rating
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ) {
   const session = await getServerSession(authOptions);
   
@@ -231,7 +88,7 @@ export async function POST(
   }
   
   // Ensure params is awaited properly
-  const resolvedParams = await Promise.resolve(params);
+  const resolvedParams = await Promise.resolve(context?.params || {} as { id: string });
   const { id } = resolvedParams;
   const userId = session.user.id;
   
@@ -289,7 +146,7 @@ export async function POST(
         id: newComment.id,
         userId: newComment.userId,
         userName: newComment.user.name || 'Anonymous User',
-        userImage: newComment.user.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(newComment.user.name || 'Anonymous')}&background=random`,
+  userImage: avatarUrl(newComment.user.name || 'Anonymous', newComment.user.image || null),
         text: newComment.text,
         createdAt: newComment.createdAt.toISOString()
       };
@@ -368,7 +225,7 @@ export async function POST(
 // PUT - Update a prompt
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ) {
   try {
     const session = await getServerSession(authOptions);
@@ -381,7 +238,7 @@ export async function PUT(
     }
     
     // Ensure params is awaited properly
-    const resolvedParams = await Promise.resolve(params);
+  const resolvedParams = await Promise.resolve(context?.params || {} as { id: string });
     const id = resolvedParams.id;
     const userId = session.user.id;
     

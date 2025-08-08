@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
-import { authOptions } from "@/app/api/auth/[...nextauth]/route";
+import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
 
 // API endpoint to follow or unfollow a user
 export async function POST(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: any
 ) {
   try {
     // Check authentication
@@ -15,11 +15,11 @@ export async function POST(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user IDs
-    const followerId = session.user.id;
-    // Await params properly before accessing properties
-    const resolvedParams = await Promise.resolve(params);
-    const { id: followingId } = resolvedParams;
+  // Get user IDs
+  const followerId = session.user.id;
+  // Ensure params is awaited properly before accessing properties
+  const resolvedParams = await Promise.resolve((context?.params || {}) as { id: string });
+  const { id: followingId } = resolvedParams;
     
     if (!followerId) {
       return NextResponse.json({ error: "User ID not found in session" }, { status: 400 });
