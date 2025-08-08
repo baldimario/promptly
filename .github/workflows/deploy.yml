@@ -11,32 +11,74 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up SSH
-        uses: webfactory/ssh-agent@v0.9.0
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Add VPS to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.VPS_HOST }} >> ~/.ssh/known_hosts
 
-      - name: Copy files to VPS
-        uses: burnett01/rsync-deployments@7.0.1
-        with:
-          switches: -avz --delete
-          path: .
-          remote_path: ${{ secrets.VPS_APP_PATH }}
-          remote_host: ${{ secrets.VPS_HOST }}
-          remote_user: ${{ secrets.VPS_USER }}
+      - name: Write SSH key file
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir -p ~/.ssh
+          if [ -n "${{ secrets.SSH_PRIVATE_KEY_B64 }}" ]; then
+            # Decode base64-encoded key (recommended to avoid formatting issues)
+            # --ignore-garbage tolerates accidental whitespace or separators
+            printf '%s' "${{ secrets.SSH_PRIVATE_KEY_B64 }}" | tr -d '\r\n' | base64 --decode --ignore-garbage > ~/.ssh/deploy_key || {
+              echo "Base64 decode failed. Ensure SSH_PRIVATE_KEY_B64 is a single-line base64 of the private key (no wraps)." >&2; exit 1; }
+          else
+            # Fallback to plain secret; strip CR characters
+            printf '%s' "${{ secrets.SSH_PRIVATE_KEY }}" | tr -d '\r' > ~/.ssh/deploy_key
+          fi
+          chmod 600 ~/.ssh/deploy_key
+          # Validate key can be parsed
+          if ! ssh-keygen -y -f ~/.ssh/deploy_key >/dev/null 2>&1; then
+            echo "Invalid SSH private key format. Prefer SSH_PRIVATE_KEY_B64 (base64-encoded)." >&2
+            exit 1
+          fi
+
+      - name: Test SSH connectivity
+        env:
+          SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+        run: |
+          set -x
+          ssh -v -i ~/.ssh/deploy_key -p ${SSH_PORT:-22} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no -T ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} echo ok
+
+      - name: Prepare code on VPS (clone or pull)
+        env:
+          REPO_CLONE_URL: ${{ (secrets.REPO_CLONE_URL != '' && secrets.REPO_CLONE_URL) || format('https://github.com/{0}.git', github.repository) }}
+          BRANCH: main
+          SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${SSH_PORT:-22} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << EOF
+          set -e
+          if [ ! -d "${{ secrets.VPS_APP_PATH }}/.git" ]; then
+            mkdir -p "${{ secrets.VPS_APP_PATH }}"
+            cd "${{ secrets.VPS_APP_PATH }}"
+            git clone --depth=1 "${REPO_CLONE_URL}" .
+            git checkout "${BRANCH}" || true
+          else
+            cd "${{ secrets.VPS_APP_PATH }}"
+            git fetch --depth=1 origin "${BRANCH}"
+            git reset --hard "origin/${BRANCH}"
+            git clean -fd
+          fi
+          EOF
 
       - name: Build and restart containers
+        env:
+          SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-          cd ${{ secrets.VPS_APP_PATH }}/stack/docker
-          export NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
-          export NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-          export DATABASE_URL=${{ secrets.DATABASE_URL }}
-          export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
-          export MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
-          export MYSQL_USER=${{ secrets.MYSQL_USER }}
-          export MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
-          docker compose -f docker-compose.prod.yaml down
-          docker compose -f docker-compose.prod.yaml build --no-cache
-          docker compose -f docker-compose.prod.yaml up -d --remove-orphans
-          EOF
+          ssh -i ~/.ssh/deploy_key -p ${SSH_PORT:-22} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
+              cd ${{ secrets.VPS_APP_PATH }}/stack/docker
+              export NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+              export NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+              export DATABASE_URL=${{ secrets.DATABASE_URL }}
+              export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+              export MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
+              export MYSQL_USER=${{ secrets.MYSQL_USER }}
+              export MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+              docker compose -f docker-compose.prod.yaml down
+              docker compose -f docker-compose.prod.yaml build --no-cache
+              docker compose -f docker-compose.prod.yaml up -d --remove-orphans
+              EOF
