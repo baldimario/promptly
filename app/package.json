@@ -9,7 +9,10 @@
     "build": "next build",
   "start": "next start",
   "lint": "next lint",
-  "test": "vitest"
+  "test": "vitest",
+  "test:unit": "vitest run",
+  "test:unit:watch": "vitest",
+  "test:e2e": "vitest run -c vitest.e2e.config.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^1.5.0",

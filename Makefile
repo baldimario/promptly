@@ -19,6 +19,9 @@ help:
 	@echo "  logs            - Show logs from all containers"
 	@echo "  logs-app        - Show logs from the app container"
 	@echo "  logs-db         - Show logs from the database container"
+	@echo "  test-unit       - Run unit tests (Vitest) inside the app container"
+	@echo "  test-e2e        - Run end-to-end tests against http://localhost:3000"
+	@echo "  test-all        - Run unit then e2e tests (brings up containers if needed)"
 	@echo "  health          - Run health checks on running containers"
 	@echo "  db-init         - Initialize the database"
 	@echo "  db-migrate      - Run database migrations"
@@ -47,6 +50,9 @@ NC := \033[0m
 
 # Default database URL if not set in environment
 DATABASE_URL ?= mysql://promptly:promptly123@localhost:3306/promptly
+
+# Helper to run commands in the app container
+APP_EXEC := $(DOCKER_COMPOSE) $(DOCKER_COMPOSE_FILE) exec -T app sh -lc
 
 # Set up development environment
 .PHONY: setup
@@ -369,3 +375,43 @@ clean:
 	else \
 		echo "Operation cancelled."; \
 	fi
+
+# Ensure app deps installed in container
+.PHONY: deps-install
+deps-install:
+	@echo "Ensuring dependencies are installed in app container..."
+	@$(DOCKER_COMPOSE) $(DOCKER_COMPOSE_FILE) up -d app db
+	@$(APP_EXEC) "cd /app && npm install"
+	@$(APP_EXEC) "cd /app && npx prisma generate"
+
+# Wait for the health endpoint to be ready
+.PHONY: wait-health
+wait-health:
+	@echo "Waiting for app health endpoint..."
+	@attempts=0; \
+	until curl -sf http://localhost:3000/api/health >/dev/null 2>&1; do \
+	  attempts=$$((attempts+1)); \
+	  if [ $$attempts -gt 60 ]; then \
+	    echo "App did not become healthy in time."; \
+	    exit 1; \
+	  fi; \
+	  sleep 1; \
+	done; \
+	echo "Health endpoint is up."
+
+# Run unit tests inside app container
+.PHONY: test-unit
+test-unit: deps-install
+	@echo "Running unit tests..."
+	@$(APP_EXEC) "cd /app && npm run test:unit"
+
+# Run e2e tests (vitest e2e) against running app
+.PHONY: test-e2e
+test-e2e: deps-install wait-health
+	@echo "Running e2e tests..."
+	@$(APP_EXEC) "cd /app && npm run test:e2e"
+
+# Run both unit and e2e tests
+.PHONY: test-all
+test-all: test-unit test-e2e
+	@echo "All tests completed."

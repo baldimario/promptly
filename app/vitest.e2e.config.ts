@@ -7,9 +7,12 @@ const __dirname = dirname(__filename);
 
 export default defineConfig({
   test: {
-    globals: true,
+    include: ['src/__e2e__/**/*.test.ts'],
     environment: 'node',
-    include: ['src/__tests__/**/*.test.ts'],
+    hookTimeout: 30000,
+    testTimeout: 60000,
+    reporters: ['default'],
+    pool: 'threads',
   },
   resolve: {
     alias: {
