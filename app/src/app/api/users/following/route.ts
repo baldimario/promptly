@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import prisma from "@/lib/prisma";
+import { FollowService } from "@/services/FollowService";
 
 // API endpoint to get users the current user is following
 export async function GET(req: NextRequest) {
@@ -24,52 +25,8 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = (page - 1) * limit;
 
-    // Get users being followed with pagination
-    const follows = await prisma.follow.findMany({
-      where: {
-        followerId: userId, // Current user is following these users
-      },
-      select: {
-        following: {
-          select: {
-            id: true,
-            name: true,
-            image: true,
-            bio: true,
-          },
-        },
-        createdAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      skip,
-      take: limit,
-    });
-
-    // Get total count of followed users
-    const totalFollowing = await prisma.follow.count({
-      where: {
-        followerId: userId,
-      },
-    });
-
-    // Format the response
-    const following = follows.map(follow => ({
-      ...follow.following,
-      followingSince: follow.createdAt,
-      isFollowing: true, // Current user is following all these users
-    }));
-
-    return NextResponse.json({
-      following,
-      pagination: {
-        total: totalFollowing,
-        page,
-        limit,
-        totalPages: Math.ceil(totalFollowing / limit),
-      },
-    });
+  const result = await FollowService.listFollowing({ userId, page, limit });
+  return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching following list:", error);
     return NextResponse.json(

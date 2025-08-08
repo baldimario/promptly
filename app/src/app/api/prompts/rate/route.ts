@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { RatingService } from "@/services/RatingService";
 
 // API endpoint for rating prompts
 export async function POST(req: NextRequest) {
@@ -29,64 +30,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Rating must be between 1 and 5" }, { status: 400 });
     }
     
-    // Check if the prompt exists
-    const prompt = await prisma.prompt.findUnique({
-      where: { id: promptId },
-    });
-    
-    if (!prompt) {
-      return NextResponse.json({ error: "Prompt not found" }, { status: 404 });
-    }
-
-    // Check if user has already rated this prompt
-    const existingRating = await prisma.rating.findUnique({
-      where: {
-        promptId_userId: {
-          promptId,
-          userId,
-        },
-      },
-    });
-
-    let userRating;
-
-    if (existingRating) {
-      // Update existing rating
-      userRating = await prisma.rating.update({
-        where: {
-          id: existingRating.id,
-        },
-        data: {
-          rating: rating,
-        },
-      });
-    } else {
-      // Create new rating
-      userRating = await prisma.rating.create({
-        data: {
-          promptId,
-          userId,
-          rating: rating,
-        },
-      });
-    }
-
-    // Calculate new average rating
-    const ratings = await prisma.rating.findMany({
-      where: {
-        promptId,
-      },
-      select: {
-        rating: true,
-      },
-    });
-
-    const totalRatings = ratings.length;
-    const averageRating = ratings.reduce((sum, item) => sum + item.rating, 0) / totalRatings;
+    // Upsert rating and compute aggregates
+    const { averageRating, totalRatings } = await RatingService.ratePrompt({ userId, promptId, rating });
 
     return NextResponse.json({
       success: true,
-      rating: userRating,
+      rating: { promptId, userId, rating },
       averageRating,
       totalRatings,
     });

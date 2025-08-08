@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth/next";
 import { authOptions } from "@/lib/authOptions";
 import prisma from "@/lib/prisma";
+import { FollowService } from "@/services/FollowService";
 
 export async function POST(req: NextRequest) {
   try {
@@ -39,48 +40,17 @@ export async function POST(req: NextRequest) {
 
     // Handle follow/unfollow action
     if (action === 'follow') {
-      // Check if already following
-      const existingFollow = await prisma.follow.findUnique({
-        where: {
-          followerId_followingId: {
-            followerId,
-            followingId: userId,
-          },
-        },
-      });
-      
-      if (existingFollow) {
-        return NextResponse.json({ error: "Already following this user" }, { status: 400 });
-      }
-      
-      // Create new follow relationship
-      await prisma.follow.create({
-        data: {
-          followerId,
-          followingId: userId,
-        },
-      });
-      
+      const exists = await FollowService.isFollowing(followerId, userId);
+      if (exists) return NextResponse.json({ error: "Already following this user" }, { status: 400 });
+      await FollowService.follow(followerId, userId);
     } else if (action === 'unfollow') {
-      // Delete follow relationship
-      await prisma.follow.delete({
-        where: {
-          followerId_followingId: {
-            followerId,
-            followingId: userId,
-          },
-        },
-      });
+      await FollowService.unfollow(followerId, userId);
     } else {
       return NextResponse.json({ error: "Invalid action. Use 'follow' or 'unfollow'." }, { status: 400 });
     }
     
     // Get updated follower count
-    const followerCount = await prisma.follow.count({
-      where: {
-        followingId: userId,
-      },
-    });
+    const followerCount = await prisma.follow.count({ where: { followingId: userId } });
     
     return NextResponse.json({
       success: true,

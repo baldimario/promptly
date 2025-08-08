@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/authOptions';
-import { AuthService } from '@/services/AuthService';
 import { prisma } from '@/lib/prisma';
 import { PromptService } from '@/services/PromptService';
 import { avatarUrl } from '@/utils/format';
+import { RatingService } from '@/services/RatingService';
 
 // Define the expected type for the prompt response
 interface PromptWithRelations {
@@ -155,57 +155,8 @@ export async function POST(
     } 
     else if (action === 'rate' && typeof content === 'number' && content >= 1 && content <= 5) {
       const rating = content;
-      
-      // Check if user already rated this prompt
-      const existingRating = await prisma.rating.findUnique({
-        where: {
-          promptId_userId: {
-            promptId: id,
-            userId
-          }
-        }
-      });
-      
-      let newRating;
-      
-      if (existingRating) {
-        // Update existing rating
-        newRating = await prisma.rating.update({
-          where: {
-            id: existingRating.id
-          },
-          data: {
-            rating
-          }
-        });
-      } else {
-        // Create new rating
-        newRating = await prisma.rating.create({
-          data: {
-            rating,
-            promptId: id,
-            userId
-          }
-        });
-      }
-      
-      // Get updated average rating
-      const allRatings = await prisma.rating.findMany({
-        where: {
-          promptId: id
-        },
-        select: {
-          rating: true
-        }
-      });
-      
-      const totalRating = allRatings.reduce((sum, r) => sum + r.rating, 0);
-      const averageRating = allRatings.length > 0 ? totalRating / allRatings.length : 0;
-      
-      return NextResponse.json({ 
-        rating: averageRating,
-        numRatings: allRatings.length
-      });
+      const { averageRating, totalRatings } = await RatingService.ratePrompt({ userId, promptId: id, rating });
+      return NextResponse.json({ rating: averageRating, numRatings: totalRatings });
     } 
     else {
       return NextResponse.json(

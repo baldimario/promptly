@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
+import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import prisma from "@/lib/prisma";
+import { parseTags } from "@/utils/format";
 
 // API endpoint to get current user's saved prompts
 export async function GET(req: NextRequest) {
@@ -37,12 +38,32 @@ export async function GET(req: NextRequest) {
             description: true,
             image: true,
             createdAt: true,
+            userId: true,
+            promptText: true,
+            exampleOutputs: true,
+            suggestedModel: true,
+            tags: true,
             user: {
               select: {
                 id: true,
                 name: true,
                 image: true,
               },
+            },
+            category: {
+              select: {
+                id: true,
+                name: true,
+                image: true,
+              },
+            },
+            ratings: {
+              select: {
+                rating: true,
+              },
+            },
+            _count: {
+              select: { ratings: true },
             },
           },
         },
@@ -63,15 +84,34 @@ export async function GET(req: NextRequest) {
     });
 
     // Format the response to flatten the data structure
-    const prompts = savedPrompts.map(savedPrompt => ({
-      id: savedPrompt.prompt.id,
-      title: savedPrompt.prompt.title,
-      description: savedPrompt.prompt.description,
-      image: savedPrompt.prompt.image,
-      createdAt: savedPrompt.prompt.createdAt,
-      savedAt: savedPrompt.createdAt,
-      author: savedPrompt.prompt.user,
-    }));
+    const prompts = savedPrompts.map(savedPrompt => {
+      const p = savedPrompt.prompt;
+      return {
+        id: p.id,
+        title: p.title,
+        description: p.description,
+        promptText: (p as any).promptText,
+        exampleOutputs: (p as any).exampleOutputs,
+        suggestedModel: (p as any).suggestedModel,
+        image: p.image,
+        createdAt: p.createdAt,
+        userId: (p as any).userId,
+        user: p.user,
+        userName: p.user?.name || 'Unknown',
+        userImage: p.user?.image || null,
+        tags: parseTags((p as any).tags),
+        categoryId: (p as any).categoryId,
+        categoryName: (p as any).category?.name,
+        categoryImage: (p as any).category?.image,
+        averageRating: (p._count?.ratings && p._count.ratings > 0)
+          ? (p.ratings?.reduce((sum: number, r: any) => sum + (r.rating || 0), 0) / p._count.ratings)
+          : 0,
+        _count: { ratings: p._count?.ratings || 0 },
+        isSaved: true,
+        savedAt: savedPrompt.createdAt,
+        author: p.user,
+      };
+    });
 
     return NextResponse.json({
       prompts,

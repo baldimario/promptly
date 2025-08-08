@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getServerSession } from "next-auth/next";
+import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import prisma from "@/lib/prisma";
+import { PromptService } from "@/services/PromptService";
 
 // API endpoint to get current user's prompts
 export async function GET(req: NextRequest) {
@@ -12,54 +12,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Get user ID from session
     const userId = session.user.id;
-    if (!userId) {
-      return NextResponse.json({ error: "User ID not found in session" }, { status: 400 });
-    }
+    if (!userId) return NextResponse.json({ error: "User ID not found in session" }, { status: 400 });
 
-    // Get query parameters
     const { searchParams } = new URL(req.url);
-    const page = parseInt(searchParams.get('page') || '1');
-    const limit = parseInt(searchParams.get('limit') || '10');
-    const skip = (page - 1) * limit;
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || searchParams.get('limit') || '10', 10);
 
-    // Get user prompts with pagination
-    const prompts = await prisma.prompt.findMany({
-      where: {
-        userId: userId,
-      },
-      select: {
-        id: true,
-        title: true,
-        description: true,
-        image: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
-      skip,
-      take: limit,
+    const result = await PromptService.list({
+      currentUserId: userId,
+      userId,
+      page,
+      pageSize,
+      sort: 'recent',
     });
 
-    // Get total count of user prompts
-    const totalPrompts = await prisma.prompt.count({
-      where: {
-        userId: userId,
-      },
-    });
-
-    return NextResponse.json({
-      prompts,
-      pagination: {
-        total: totalPrompts,
-        page,
-        limit,
-        totalPages: Math.ceil(totalPrompts / limit),
-      },
-    });
+    return NextResponse.json(result);
   } catch (error) {
     console.error("Error fetching user prompts:", error);
     return NextResponse.json(

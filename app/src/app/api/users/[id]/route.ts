@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { FollowService } from "@/services/FollowService";
 
 // API endpoint to get a user's profile
 export async function GET(
@@ -45,18 +46,7 @@ export async function GET(
     }
 
     // Check if the current user is following this user
-    let isFollowing = false;
-    if (currentUserId) {
-      const followRecord = await prisma.follow.findUnique({
-        where: {
-          followerId_followingId: {
-            followerId: currentUserId,
-            followingId: userId,
-          }
-        }
-      });
-      isFollowing = !!followRecord;
-    }
+  const isFollowing = await FollowService.isFollowing(currentUserId, userId);
 
     return NextResponse.json({
       ...user,
