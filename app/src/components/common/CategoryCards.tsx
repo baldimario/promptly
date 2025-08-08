@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -137,15 +137,61 @@ const CategoryCards: React.FC<CategoryCardsProps> = ({
     );
   };
 
+  const [expanded, setExpanded] = useState(false);
+  
+  // Calculate the number of items per row based on grid columns
+  const itemsPerRow = {
+    'xs': 2, // grid-cols-2
+    'sm': 3, // sm:grid-cols-3
+    'md': 4, // md:grid-cols-4
+    'lg': 6  // lg:grid-cols-6
+  };
+  
+  // Get the appropriate number of items for the first row based on screen size
+  // We'll use the lg size as default since we're using mobile-first approach
+  // Default to 6 items (lg screens) for the first row
+  const firstRowCount = itemsPerRow.lg;
+  
+  // If "All" option is shown, it takes one slot in the first row
+  const offset = showAllOption ? 1 : 0;
+  
+  // Calculate how many categories would fit in the first row
+  const firstRowItemCount = firstRowCount - offset;
+  
+  // Determine if we have more categories than fit in the first row
+  const hasMoreCategories = categories.length > firstRowItemCount;
+  
+  // Get visible items based on expanded state
+  const visibleCategories = expanded ? categories : categories.slice(0, firstRowItemCount);
+
   return (
     <div className="my-6">
-      <h2 className="text-text text-xl font-bold mb-4">{title}</h2>
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-text text-xl font-bold">{title}</h2>
+        {hasMoreCategories && (
+          <button 
+            onClick={() => setExpanded(!expanded)}
+            className="flex items-center justify-center p-1 rounded-full hover:bg-secondary transition-colors"
+          >
+            <span className="sr-only">{expanded ? 'Show less' : 'Show more'}</span>
+            {expanded ? (
+              <div className="w-6 h-6 flex items-center justify-center">
+                <span className="text-[#bada55] text-lg font-bold leading-none mb-0.5">−</span>
+              </div>
+            ) : (
+              <div className="w-6 h-6 flex items-center justify-center">
+                <span className="text-[#bada55] text-lg font-bold leading-none">+</span>
+              </div>
+            )}
+          </button>
+        )}
+      </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
         {/* Show "All" option if requested */}
         {showAllOption && renderCategoryItem(null)}
         
-        {/* Show all category items */}
-        {categories.map((category) => renderCategoryItem(category))}
+        {/* Show visible category items */}
+        {visibleCategories.map((category) => renderCategoryItem(category))}
       </div>
     </div>
   );
