@@ -242,8 +242,7 @@ export async function PUT(
     const imageUrls = [...existingImages]; // Start with existing images that were not removed
     
     // Upload new images using the same method as in the POST endpoint
-    // For simplicity, we'll skip the Cloudinary integration for now as it seems
-    // the application might be using a local file upload system
+    // For simplicity, we'll skip the Cloudinary integration for now
 
     // Update the prompt in the database with correct typing for Prisma
     const updatedPrompt = await prisma.prompt.update({

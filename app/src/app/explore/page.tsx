@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import PromptCard from '@/components/common/PromptCard';
 import CategoryCards from '@/components/common/CategoryCards';
@@ -44,7 +44,10 @@ interface Prompt {
 
 type FilterMode = 'followed' | 'all' | 'trending';
 
-export default function ExplorePage() {
+// Force dynamic rendering to avoid static prerender errors when using useSearchParams
+export const dynamic = 'force-dynamic';
+
+function ExplorePageInner() {
   const router = useRouter();
   const { data: session, status } = useSession();
   const searchParams = useSearchParams();
@@ -263,7 +266,7 @@ export default function ExplorePage() {
   };
 
   return (
-    <>
+      <>
       <div className="flex flex-col w-full">
         <div className="px-4 py-3">
           <form onSubmit={handleSearch}>
@@ -483,6 +486,14 @@ export default function ExplorePage() {
           </div>
         )}
       </div>
-    </>
+      </>
+  );
+}
+
+export default function ExplorePage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center p-12">Loading explore…</div>}>
+      <ExplorePageInner />
+    </Suspense>
   );
 }

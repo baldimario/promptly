@@ -1,7 +1,7 @@
 'use client';
 
 import { useSearchParams, useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useSession } from 'next-auth/react';
 import Link from 'next/link';
 import PromptCard from '@/components/common/PromptCard';
@@ -39,7 +39,10 @@ interface Prompt {
 // Sort options
 type SortOption = 'newest' | 'rating' | 'popular';
 
-export default function SearchPage() {
+// Force dynamic rendering due to useSearchParams to avoid static prerender errors
+export const dynamic = 'force-dynamic';
+
+function SearchPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session } = useSession();
@@ -385,7 +388,7 @@ export default function SearchPage() {
   };
 
   return (
-    <div className="container mx-auto py-8 px-4">
+      <div className="container mx-auto py-8 px-4">
       <h1 className="text-3xl font-bold mb-8">Search Results for: &quot;{query}&quot;</h1>
       
       {loading ? (
@@ -623,6 +626,14 @@ export default function SearchPage() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="container mx-auto py-8 px-4">Loading search…</div>}>
+      <SearchPageInner />
+    </Suspense>
   );
 }

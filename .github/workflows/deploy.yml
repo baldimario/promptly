@@ -70,18 +70,19 @@ jobs:
           SSH_PORT: ${{ secrets.VPS_SSH_PORT }}
         run: |
           ssh -i ~/.ssh/deploy_key -p ${SSH_PORT:-22} -o IdentitiesOnly=yes -o StrictHostKeyChecking=no ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'EOF'
-              cd ${{ secrets.VPS_APP_PATH }}/stack/docker
-              export NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
-              export NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
-              export DATABASE_URL=${{ secrets.DATABASE_URL }}
-              export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
-              export MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
-              export MYSQL_USER=${{ secrets.MYSQL_USER }}
-              export MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
-              # Ensure uploads directory exists and is writable on the host (mounted into app at /app/public/uploads)
-              mkdir -p ${{ secrets.VPS_APP_PATH }}/stack/docker/data/uploads
-              chmod -R 775 ${{ secrets.VPS_APP_PATH }}/stack/docker/data/uploads || true
-              docker compose -f docker-compose.prod.yaml down
-              docker compose -f docker-compose.prod.yaml build --no-cache
-              docker compose -f docker-compose.prod.yaml up -d --remove-orphans
-              EOF
+          cd ${{ secrets.VPS_APP_PATH }}/stack/docker
+          export NEXTAUTH_URL=${{ secrets.NEXTAUTH_URL }}
+          export NEXTAUTH_SECRET=${{ secrets.NEXTAUTH_SECRET }}
+          export DATABASE_URL=${{ secrets.DATABASE_URL }}
+          export MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}
+          export MYSQL_DATABASE=${{ secrets.MYSQL_DATABASE }}
+          export MYSQL_USER=${{ secrets.MYSQL_USER }}
+          export MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}
+          # Ensure uploads directory exists and is writable on the host (mounted into app at /app/public/uploads)
+          mkdir -p ${{ secrets.VPS_APP_PATH }}/stack/docker/data/uploads
+          chmod -R 775 ${{ secrets.VPS_APP_PATH }}/stack/docker/data/uploads || true
+          docker compose -f docker-compose.prod.yaml down
+          docker compose -f docker-compose.prod.yaml build --no-cache
+          docker compose -f docker-compose.prod.yaml up -d --remove-orphans
+          EOF
+
