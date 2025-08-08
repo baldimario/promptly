@@ -107,9 +107,19 @@ export default function SearchPage() {
         setPrompts(data.prompts);
         setPagination(data.pagination);
         
-        // Extract unique categories from all prompts
-        const allCategories = data.prompts.flatMap((prompt: Prompt) => prompt.categories);
-        const uniqueCategories = [...new Set(allCategories)] as string[];
+        // Extract unique category names from prompts using both new and legacy fields
+        const allCategories: string[] = data.prompts.flatMap((prompt: Prompt) => {
+          const names: string[] = [];
+          if (prompt.categoryName) names.push(prompt.categoryName);
+          if (Array.isArray(prompt.categories)) names.push(...prompt.categories.filter(Boolean));
+          return names;
+        });
+        const uniqueCategories = Array.from(new Set(
+          allCategories
+            .map((c) => (typeof c === 'string' ? c.trim() : ''))
+            .filter((c) => c.length > 0)
+        ))
+          .sort((a, b) => a.localeCompare(b));
         setAvailableCategories(uniqueCategories);
       } catch (error) {
         console.error('Error fetching search results:', error);
@@ -434,41 +444,35 @@ export default function SearchPage() {
               </div>
               
               <div>
-                <h3 className="font-semibold mb-2">Categories</h3>
-                {/* If we have search result categories, show those */}
-                {availableCategories.length > 0 ? (
-                  <div className="flex flex-col space-y-1 max-h-60 overflow-y-auto">
-                    {availableCategories.map(category => (
-                      <label key={category} className="flex items-center space-x-2 cursor-pointer">
-                        <input 
-                          type="checkbox"
-                          className="form-checkbox h-4 w-4 text-primary"
-                          checked={selectedCategories.includes(category)}
-                          onChange={() => toggleCategory(category)}
-                        />
-                        <span>{category}</span>
-                      </label>
-                    ))}
-                  </div>
-                ) : popularCategories.length > 0 && !loading ? (
-                  /* Otherwise show popular categories as clickable tags */
-                  <div className="flex flex-wrap gap-2">
-                    {popularCategories.map(category => (
-                      <button
-                        key={category.id}
-                        onClick={() => toggleCategory(category.name)}
-                        className={`px-3 py-1 rounded-full text-sm ${
-                          selectedCategories.includes(category.name) 
-                            ? 'bg-primary text-white' 
-                            : 'bg-gray-100 hover:bg-gray-200'
-                        }`}
-                      >
-                        {category.name}
-                        <span className="ml-1 text-xs">({category.promptCount})</span>
-                      </button>
-                    ))}
-                  </div>
-                ) : null}
+                <div className="mb-2">
+                  <h3 className="font-semibold">Categories</h3>
+                </div>
+
+                {/* Build a unified category name list from search results or fallback to popular categories */}
+                {(() => {
+                  const namesFromResults = availableCategories;
+                  const namesFromPopular = popularCategories.map((c) => c.name);
+                  const unified = (namesFromResults.length > 0 ? namesFromResults : namesFromPopular)
+                    .map((c) => (typeof c === 'string' ? c.trim() : ''))
+                    .filter((c) => c.length > 0);
+                  if (unified.length === 0) return null;
+
+                  return (
+                    <div className="flex flex-col space-y-1 max-h-60 overflow-y-auto">
+                      {unified.map((category) => (
+                        <label key={`cat-${category}`} className="flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="form-checkbox h-4 w-4 text-primary mr-2"
+                            checked={selectedCategories.includes(category)}
+                            onChange={() => toggleCategory(category)}
+                          />
+                          <span className="text-primary">{category}</span>
+                        </label>
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </div>
