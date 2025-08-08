@@ -105,11 +105,8 @@ export function getPromptImageUrl(prompt: {
 }): string {
   // Check if we have a valid image URL
   if (prompt.image && typeof prompt.image === 'string' && prompt.image.trim() !== '') {
-    // Ensure the image URL is absolute (add origin if it's a relative URL)
-    if (prompt.image.startsWith('/') && typeof window !== 'undefined') {
-      return `${window.location.origin}${prompt.image}`;
-    }
-    return prompt.image;
+  // Keep relative URLs as-is to be served by Next/Image from public/
+  return prompt.image;
   }
   
   // Use tags if available, fall back to categories for backward compatibility

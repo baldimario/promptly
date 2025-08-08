@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import { prisma } from "@/lib/prisma";
+import { SaveService } from "@/services/SaveService";
 import { parseTags } from "@/utils/format";
 
 // API endpoint to get a user's saved prompts
@@ -112,35 +113,40 @@ export async function GET(
       prompt: PromptWithIncludes;
     }
 
-    // Format the prompts data
-    const formattedPrompts = savedPrompts.map((savedPrompt: SavedPromptWithIncludes) => {
-      const prompt = savedPrompt.prompt;
-      
-      // Calculate average rating
-      const totalRating = prompt.ratings.reduce((sum: number, rating: RatingInfo) => sum + rating.rating, 0);
-      const averageRating = prompt.ratings.length > 0 ? totalRating / prompt.ratings.length : 0;
-      
-      // Extract tags from JSON string if available
-  const tags = parseTags(prompt.tags);
-      
-      // Format category
-      const categoryName = prompt.category?.name || null;
-      const categoryId = prompt.category?.id || null;
-      const categoryImage = prompt.category?.image || null;
-      
-      // Remove ratings array and category object from response
-      const { ratings, category, ...promptWithoutRatings } = prompt;
-      
-      return {
-        ...promptWithoutRatings,
-        categoryId,
-        categoryName,
-        categoryImage,
-        tags,
-        averageRating,
-        isSaved: true  // These are saved prompts
-      };
-    });
+    // Format the prompts data and attach saveCount via SaveService
+    const formattedPrompts = await Promise.all(
+      savedPrompts.map(async (savedPrompt: SavedPromptWithIncludes) => {
+        const prompt = savedPrompt.prompt;
+        
+        // Calculate average rating
+        const totalRating = prompt.ratings.reduce((sum: number, rating: RatingInfo) => sum + rating.rating, 0);
+        const averageRating = prompt.ratings.length > 0 ? totalRating / prompt.ratings.length : 0;
+        
+        // Extract tags from JSON string if available
+        const tags = parseTags(prompt.tags);
+        
+        // Format category
+        const categoryName = prompt.category?.name || null;
+        const categoryId = prompt.category?.id || null;
+        const categoryImage = prompt.category?.image || null;
+        
+        // Remove ratings array and category object from response
+        const { ratings, category, ...promptWithoutRatings } = prompt;
+
+        const saveCount = await SaveService.count(prompt.id);
+        
+        return {
+          ...promptWithoutRatings,
+          categoryId,
+          categoryName,
+          categoryImage,
+          tags,
+          averageRating,
+          isSaved: true, // These are saved prompts
+          saveCount,
+        };
+      })
+    );
 
     return NextResponse.json(formattedPrompts);
   } catch (error) {

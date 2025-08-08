@@ -2,6 +2,7 @@ import prisma from '@/lib/prisma';
 import { averageRating, parseTags, avatarUrl } from '@/utils/format';
 import { getPromptImageUrl } from '@/utils/placeholderImage';
 import { ImageService } from './ImageService';
+import { SaveService } from './SaveService';
 
 export class PromptService {
   static async getById(id: string, currentUserId?: string | null) {
@@ -21,16 +22,13 @@ export class PromptService {
 
     if (!prompt) return null;
 
-    const images = ImageService.listPromptImages(prompt.id);
+  const images = ImageService.listPromptImages(prompt.id);
   const imageUrls = images.length > 0 ? images : prompt.image ? [prompt.image] : [];
+  const tags = parseTags(prompt.tags as string | null | undefined);
+  const mainImage = prompt.image || imageUrls[0] || getPromptImageUrl({ title: prompt.title, userName: prompt.user?.name || 'Unknown', tags });
 
-    const isSaved = currentUserId
-      ? !!(await prisma.savedPrompt.findUnique({
-          where: { userId_promptId: { userId: currentUserId, promptId: id } },
-        }))
-      : false;
+  const isSaved = await SaveService.isSaved(currentUserId, id);
 
-    const tags = parseTags(prompt.tags as string | null | undefined);
     const avg = averageRating(prompt.ratings);
 
     return {
@@ -40,13 +38,15 @@ export class PromptService {
       promptText: prompt.promptText,
       exampleOutputs: prompt.exampleOutputs,
       suggestedModel: prompt.suggestedModel,
-  image: prompt.image || getPromptImageUrl({ title: prompt.title, userName: prompt.user?.name || 'Unknown', tags }),
-      imageUrls,
+      image: mainImage,
+      imageUrls: imageUrls.length > 0 ? imageUrls : mainImage ? [mainImage] : [],
       userId: prompt.userId,
       userName: prompt.user?.name || 'Unknown',
       userImage: avatarUrl(prompt.user?.name || 'Unknown', prompt.user?.image || null),
       createdAt: prompt.createdAt.toISOString(),
-      ratings: avg,
+  ratings: avg,
+  rating: avg,
+  averageRating: avg,
       numRatings: prompt._count?.ratings || 0,
       comments: prompt.comments.map((c) => ({
         id: c.id,
@@ -114,14 +114,7 @@ export class PromptService {
       take: pageSize,
     });
 
-    let savedIds: string[] = [];
-    if (currentUserId) {
-      const saved = await prisma.savedPrompt.findMany({
-        where: { userId: currentUserId },
-        select: { promptId: true },
-      });
-      savedIds = saved.map((s) => s.promptId);
-    }
+  const savedIds: string[] = await SaveService.listSavedPromptIds(currentUserId);
 
   const items = prompts.map((p: any) => {
       const tags = parseTags(p.tags as string | null | undefined);
@@ -147,8 +140,8 @@ export class PromptService {
         categoryId: p.categoryId || undefined,
         categoryName: p.category?.name,
         categoryImage: (p as any).category?.image,
-        rating: avg,
-        averageRating: avg,
+  rating: avg,
+  averageRating: avg,
         numRatings: p._count?.ratings || 0,
         _count: { ratings: p._count?.ratings || 0 },
         suggestedModel: (p as any).suggestedModel,

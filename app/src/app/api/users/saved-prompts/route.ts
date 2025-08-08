@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
 import prisma from "@/lib/prisma";
+import { SaveService } from "@/services/SaveService";
 import { parseTags } from "@/utils/format";
 
 // API endpoint to get current user's saved prompts
@@ -77,11 +78,7 @@ export async function GET(req: NextRequest) {
     });
 
     // Get total count of saved prompts
-    const totalSavedPrompts = await prisma.savedPrompt.count({
-      where: {
-        userId: userId,
-      },
-    });
+  const totalSavedPrompts = await SaveService.countForUser(userId);
 
     // Format the response to flatten the data structure
     const prompts = savedPrompts.map(savedPrompt => {

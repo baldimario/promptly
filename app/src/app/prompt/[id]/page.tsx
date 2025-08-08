@@ -197,19 +197,25 @@ export default function PromptDetail() {
           {/* Main prompt image */}
           <div className="w-full mb-6">
             <div className="aspect-[2/1] relative overflow-hidden rounded-lg">
-              <Image
-                src={getPromptImageUrl({
+              {(() => {
+                const imageSrc = getPromptImageUrl({
                   title: prompt.title,
                   image: prompt.image,
                   userName: prompt.userName,
                   tags: prompt.tags || []
-                })}
-                alt={prompt.title}
-                fill
-                className="object-cover"
-                priority
-                unoptimized={!prompt.image} // Unoptimized for external placeholder images
-              />
+                });
+                const isExternal = typeof imageSrc === 'string' && imageSrc.startsWith('http');
+                return (
+                  <Image
+                    src={imageSrc}
+                    alt={prompt.title}
+                    fill
+                    className="object-cover"
+                    priority
+                    unoptimized={isExternal}
+                  />
+                );
+              })()}
             </div>
           </div>
           

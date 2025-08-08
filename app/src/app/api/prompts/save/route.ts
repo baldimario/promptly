@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/authOptions";
-import { AuthService } from "@/services/AuthService";
 import { prisma } from "@/lib/prisma";
+import { SaveService } from "@/services/SaveService";
 
 // API endpoint to save or unsave a prompt
 export async function POST(req: NextRequest) {
@@ -37,52 +37,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Prompt not found" }, { status: 404 });
     }
 
-    if (action === 'save') {
-      // Check if already saved
-      const existingSave = await prisma.savedPrompt.findUnique({
-        where: {
-          userId_promptId: {
-            userId,
-            promptId,
-          },
-        },
-      });
-      
-      // If not already saved, save it now
-      if (!existingSave) {
-        await prisma.savedPrompt.create({
-          data: {
-            userId,
-            promptId,
-          },
-        });
-      }
-      // If already saved, do nothing (it's not an error)
-    } else {
-      // Unsave the prompt
-      await prisma.savedPrompt.delete({
-        where: {
-          userId_promptId: {
-            userId,
-            promptId,
-          },
-        },
-      });
-    }
-    
-    // Get updated save count for this prompt
-    const saveCount = await prisma.savedPrompt.count({
-      where: {
-        promptId,
-      },
-    });
-    
-    return NextResponse.json({
-      success: true,
-      action,
-      promptId,
-      saveCount,
-    });
+  const { isSaved, saveCount } = await SaveService.toggle({ userId, promptId, action });
+  return NextResponse.json({ success: true, action, promptId, isSaved, saveCount });
   } catch (error) {
     console.error("Error in save/unsave prompt operation:", error);
     return NextResponse.json(
