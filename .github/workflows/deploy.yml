@@ -81,8 +81,12 @@ jobs:
           # Ensure uploads directory exists and is writable on the host (mounted into app at /app/public/uploads)
           mkdir -p ${{ secrets.VPS_APP_PATH }}/stack/docker/data/uploads
           chmod -R 775 ${{ secrets.VPS_APP_PATH }}/stack/docker/data/uploads || true
-          docker compose -f docker-compose.prod.yaml down
-          docker compose -f docker-compose.prod.yaml build --no-cache
-          docker compose -f docker-compose.prod.yaml up -d --remove-orphans
+          cd ${{ secrets.VPS_APP_PATH }}
+          make down
+          make build
+          make up
+          #docker compose -f docker-compose.prod.yaml down
+          #docker compose -f docker-compose.prod.yaml build --no-cache
+          #docker compose -f docker-compose.prod.yaml up -d --remove-orphans
           EOF
 

@@ -29,9 +29,9 @@ services:
     environment:
       - PMA_HOST=db
       - PMA_PORT=3306
-      - PMA_USER=promptly
-      - PMA_PASSWORD=promptlypass
-      - MYSQL_ROOT_PASSWORD=rootpassword
+      #- PMA_USER=promptly
+      #- PMA_PASSWORD=promptlypass
+      #- MYSQL_ROOT_PASSWORD=rootpassword
     depends_on:
       - db
     restart: unless-stopped
