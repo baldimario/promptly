@@ -9,6 +9,7 @@ services:
     volumes:
       - ../../app:/app
       - /app/node_modules  # This prevents the node_modules from being overwritten by the bind mount
+      - ./data/uploads:/app/public/uploads
     environment:
       - NODE_ENV=development
       - NEXTAUTH_URL=http://localhost:3000

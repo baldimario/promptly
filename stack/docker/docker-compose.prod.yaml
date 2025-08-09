@@ -16,6 +16,8 @@ services:
     restart: unless-stopped
     volumes:
       - ./data/uploads:/app/public/uploads
+      - ../../app:/app
+      - /app/node_modules  # This prevents the node_modules from being overwritten by the bind mount
 
   db:
     image: mysql:8.0
@@ -27,6 +29,7 @@ services:
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
     volumes:
       - ./data/mysql:/var/lib/mysql
+      - ./data/db_init:/docker-entrypoint-initdb.d
     command: --default-authentication-plugin=mysql_native_password
     expose:
       - "3306"

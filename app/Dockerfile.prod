@@ -24,11 +24,13 @@ RUN addgroup -g 1001 -S nodejs && adduser -S nextjs -G nodejs -u 1001
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/package-lock.json ./package-lock.json
 RUN npm ci --omit=dev
+# Regenerate Prisma Client in the final image to match production NODE_ENV and ensure availability
+RUN npx prisma generate
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/prisma ./prisma
 # Ensure uploads directory exists in the image
 RUN mkdir -p /app/public/uploads/images && chown -R nextjs:nodejs /app/public/uploads
 EXPOSE 3000
-USER nextjs
+#USER nextjs
 CMD ["npm","run","start"]
