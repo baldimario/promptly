@@ -69,6 +69,8 @@ model Prompt {
   promptText      String    @map("prompt_text") @db.Text
   exampleOutputs  String?   @map("example_outputs") @db.Text
   suggestedModel  String    @map("suggested_model")
+  // New normalized relation (optional for backfill). Keep suggestedModel string for legacy & fast grouping until migration complete.
+  modelId         String?   @map("model_id")
   image           String?
   userId          String    @map("user_id")
   tags            String?   @db.Text
@@ -77,11 +79,27 @@ model Prompt {
   updatedAt       DateTime  @updatedAt @map("updated_at")
   user            User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   category        Category? @relation(fields: [categoryId], references: [id])
+  aiModel         Model?    @relation(fields: [modelId], references: [id])
   comments        Comment[]
   ratings         Rating[]
   savedBy         SavedPrompt[]
 
   @@map("prompts")
+  @@index([modelId], map: "idx_prompts_model_id")
+}
+
+model Model {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  provider    String?
+  description String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+  prompts     Prompt[]
+
+  @@unique([name])
+  @@map("models")
 }
 
 model Category {

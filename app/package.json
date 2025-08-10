@@ -12,7 +12,8 @@
   "test": "vitest",
   "test:unit": "vitest run",
   "test:unit:watch": "vitest",
-  "test:e2e": "vitest run -c vitest.e2e.config.ts"
+  "test:e2e": "vitest run -c vitest.e2e.config.ts",
+  "seed:models": "ts-node --transpile-only prisma/seedModels.ts || node --loader ts-node/esm prisma/seedModels.ts || node dist/prisma/seedModels.js"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^1.5.0",
@@ -38,6 +39,7 @@
     "eslint-config-next": "15.4.5",
     "tailwindcss": "^4",
   "typescript": "^5",
+  "ts-node": "^10.9.2",
   "vitest": "^1.6.0"
   }
 }

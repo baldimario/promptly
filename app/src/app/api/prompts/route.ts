@@ -71,7 +71,8 @@ export async function POST(request: NextRequest) {
     const promptText = formData.get('promptText') as string;
     const description = formData.get('description') as string;
     const exampleOutputs = formData.get('exampleOutputs') as string;
-    const suggestedModel = formData.get('suggestedModel') as string;
+  const suggestedModel = formData.get('suggestedModel') as string; // still accepted for backward compatibility
+  const modelSlug = (formData.get('modelSlug') as string) || suggestedModel;
     const categoryId = formData.get('categoryId') as string;
     const tagsInput = formData.get('tags') as string;
     const outputImages = formData.getAll('outputImages') as File[];
@@ -98,18 +99,29 @@ export async function POST(request: NextRequest) {
       // Create the prompt with a transaction to ensure all operations succeed or fail together
       const newPrompt = await prisma.$transaction(async (tx) => {
         // First create the prompt without images to get the ID
+        // Try to resolve a Model by slug (normalized table)
+        let modelId: string | null = null;
+        if (modelSlug) {
+          try {
+            const model = await (prisma as any).model?.findUnique({ where: { slug: modelSlug } });
+            if (model) modelId = model.id;
+          } catch (_) {
+            // ignore if table not migrated yet
+          }
+        }
         const prompt = await tx.prompt.create({
-          data: {
+          data: ({
             title,
             description,
             promptText,
             exampleOutputs: exampleOutputs || null,
-            suggestedModel,
+            suggestedModel: suggestedModel || modelSlug || 'other',
+            modelId: modelId || null,
             image: null, // We'll update this after processing images
             userId: user.id,
             tags: tags.length > 0 ? JSON.stringify(tags) : null,
             categoryId: categoryId || null
-          },
+          }) as any,
           include: {
             user: true,
             category: true
@@ -164,6 +176,7 @@ export async function POST(request: NextRequest) {
           userImage: newPrompt.user.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(newPrompt.user.name)}&background=random`,
           createdAt: newPrompt.createdAt.toISOString(),
           suggestedModel: newPrompt.suggestedModel,
+          modelId: (newPrompt as any).modelId || null,
           imageUrls: newPrompt.imageUrls || [],
           tags: tags,
           categoryId: newPrompt.categoryId,

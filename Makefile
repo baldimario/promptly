@@ -26,6 +26,7 @@ help:
 	@echo "  db-init         - Initialize the database"
 	@echo "  db-migrate      - Run database migrations"
 	@echo "  db-push         - Push schema changes directly to database (dev only)"
+	@echo "  db-migrate-dev  - Create & apply a Prisma migration (prisma migrate dev --name <name>)"
 	@echo "  db-generate     - Generate Prisma client"
 	@echo "  db-reset        - Reset the database (warning: deletes all data)"
 	@echo "  db-reset-migrate - Reset database and apply schema (warning: deletes all data)"
@@ -322,6 +323,24 @@ db-reset-migrate:
 	@(cd app && $(PRISMA_CMD) db push)
 	
 	@echo "Reset and migration complete."
+
+# Create & apply a Prisma migration (keeps history). Usage:
+# make db-migrate-dev NAME=add_model_table
+.PHONY: db-migrate-dev
+db-migrate-dev:
+	@if [ -z "$(NAME)" ]; then \
+		echo "Missing NAME. Usage: make db-migrate-dev NAME=descriptive_migration_name"; \
+		exit 1; \
+	fi
+	@echo "Running prisma migrate dev with name '$(NAME)'..."
+	# Ensure db is up
+	@$(DOCKER_COMPOSE) $(DOCKER_COMPOSE_FILE) up -d db
+	# Ensure deps installed & client generated
+	@if [ ! -d "./app/node_modules/@prisma/client" ]; then \
+		(cd app && npm install); \
+	fi
+	@cd app && $(PRISMA_CMD) migrate dev --name "$(NAME)"
+	@echo "Migration complete."
 
 # Open Prisma Studio
 .PHONY: db-studio

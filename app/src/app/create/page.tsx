@@ -5,7 +5,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
 import Modal from '@/components/common/Modal';
 import CategorySelect from '@/components/common/CategorySelect';
-import Select from '@/components/common/Select';
+import ModelSelect from '@/components/common/ModelSelect';
 import TagInput from '@/components/common/TagInput';
 import { Button } from '@/components/common/Button';
 import useModal from '@/hooks/useModal';
@@ -30,24 +30,7 @@ export default function CreatePrompt() {
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Available AI models
-  const aiModels = [
-    { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
-    { value: 'gpt-4o', label: 'GPT-4o' },
-    { value: 'gpt-4', label: 'GPT-4' },
-    { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' },
-    { value: 'gemini-1.5-pro', label: 'Gemini 1.5 Pro' },
-    { value: 'gemini-1.5-flash', label: 'Gemini 1.5 Flash' },
-    { value: 'claude-3-opus', label: 'Claude 3 Opus' },
-    { value: 'claude-3-sonnet', label: 'Claude 3 Sonnet' },
-    { value: 'claude-3-haiku', label: 'Claude 3 Haiku' },
-    { value: 'mistral-large', label: 'Mistral Large' },
-    { value: 'mistral-medium', label: 'Mistral Medium' },
-    { value: 'mistral-small', label: 'Mistral Small' },
-    { value: 'llama-3', label: 'Llama 3' },
-    { value: 'palm-2', label: 'PaLM 2' },
-    { value: 'other', label: 'Other' }
-  ];
+  // AI models now dynamically loaded via ModelSelect component
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -304,20 +287,13 @@ export default function CreatePrompt() {
           <div className="flex max-w-[640px] flex-wrap items-end gap-4 px-4 py-3">
             <label className="flex flex-col min-w-40 flex-1">
               <span className="text-sm font-medium mb-1 text-text-muted">Suggested AI Model <span className="text-red-500">*</span></span>
-              <Select
-                value={formData.suggestedModel}
-                onChange={(value) => {
-                  setFormData(prev => ({
-                    ...prev,
-                    suggestedModel: value || ''
-                  }));
-                }}
-                options={aiModels}
-                placeholder="Select an AI model"
-                allowClear={false}
+              <ModelSelect
+                value={formData.suggestedModel || null}
+                onChange={(value: string | null) => setFormData(prev => ({ ...prev, suggestedModel: value || '' }))}
                 className="w-full"
               />
               {!formData.suggestedModel && <input type="hidden" name="suggestedModel" required />}
+              <p className="text-xs text-text-muted mt-1">Models pulled from existing prompts & curated list.</p>
             </label>
           </div>
           
