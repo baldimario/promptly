@@ -60,8 +60,50 @@ export const authOptions: NextAuthOptions = {
   ],
   pages: { signIn: '/login', signOut: '/', error: '/login', newUser: '/signup' },
   callbacks: {
-    async signIn({ user, credentials }) {
+    async signIn({ user, credentials, account, profile }) {
+      // Allow credentials flow as-is
       if (credentials) return true;
+
+      // Auto-link verified Google account to an existing user with same email
+      if (account?.provider === 'google' && profile && (profile as any).email && (profile as any).email_verified) {
+        const email = (profile as any).email as string;
+        try {
+          const existingUser = await prisma.user.findUnique({ where: { email } });
+          if (existingUser) {
+            // Check if account already linked
+            const existingAccount = await prisma.account.findFirst({
+              where: {
+                userId: existingUser.id,
+                provider: account.provider,
+                providerAccountId: account.providerAccountId,
+              },
+            });
+            if (!existingAccount) {
+              await prisma.account.create({
+                data: {
+                  userId: existingUser.id,
+                  type: account.type,
+                  provider: account.provider,
+                  providerAccountId: account.providerAccountId,
+                  accessToken: (account as any).access_token,
+                  refreshToken: (account as any).refresh_token,
+                  expiresAt: (account as any).expires_at,
+                  tokenType: (account as any).token_type,
+                  scope: (account as any).scope,
+                  idToken: (account as any).id_token,
+                  sessionState: (account as any).session_state,
+                },
+              });
+            }
+            // Ensure the session associates with existing user id
+            (user as any).id = existingUser.id;
+            return true;
+          }
+        } catch (e) {
+          console.error('Auto-link signIn error:', e);
+          // Fall through to default behavior
+        }
+      }
       return !!user?.email;
     },
     async redirect({ url, baseUrl }) {
