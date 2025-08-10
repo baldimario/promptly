@@ -10,12 +10,11 @@ services:
       - ../../app:/app
       - /app/node_modules  # This prevents the node_modules from being overwritten by the bind mount
       - ./data/uploads:/app/public/uploads
-    environment:
-      - NODE_ENV=development
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=7d7103809203c46bfc06115b9fc5ba34  # A randomly generated secure value
-      # Database connection
-      - DATABASE_URL=mysql://promptly:promptlypass@db:3306/promptly
+    # Load shared variables from project root .env (one directory up from repo root -> ../../.env)
+    # This keeps secrets out of the compose file and centralizes configuration.
+    env_file:
+      - ../../.env
+    # Optionally override / add only what differs for container networking.
     restart: unless-stopped
     command: npm run dev
     depends_on:
@@ -45,11 +44,12 @@ services:
     volumes:
       - ./data/mysql:/var/lib/mysql
       - ./data/db_init:/docker-entrypoint-initdb.d
+    # Reuse same root .env so MySQL credentials are not duplicated.
+    env_file:
+      - ../../.env
     environment:
-      - MYSQL_ROOT_PASSWORD=rootpassword
-      - MYSQL_DATABASE=promptly
-      - MYSQL_USER=promptly
-      - MYSQL_PASSWORD=promptlypass
+      # Allow override of password if root .env differs; fallback to promptly123
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-promptly123}
     command: --default-authentication-plugin=mysql_native_password
     cap_add:
       - SYS_NICE  # CAP_SYS_NICE to avoid MySQL warnings
