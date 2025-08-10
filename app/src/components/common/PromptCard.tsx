@@ -1,3 +1,4 @@
+"use client";
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -6,6 +7,7 @@ import CategoryBadge from '@/components/common/CategoryBadge';
 import SaveButton from '@/components/common/SaveButton';
 import { RatingDisplay } from '@/components/common/RatingStars';
 import { getPromptImageUrl } from '@/utils/placeholderImage';
+import { useSession } from 'next-auth/react';
 
 export interface PromptCardProps {
   id: string;
@@ -50,6 +52,7 @@ const PromptCard: React.FC<PromptCardProps> = ({
 }) => {
   // Generate avatar URL if needed
   const avatarUrl = userImage || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=random`;
+  const { data: session } = useSession();
 
   return (
     <div className="group rounded-lg border border-border border-[#bada55] bg-background overflow-hidden flex flex-col h-full transition-all hover:border-white hover:shadow-md">
@@ -87,13 +90,15 @@ const PromptCard: React.FC<PromptCardProps> = ({
             </h3>
           </Link>
           
-          {/* Save button */}
-          <SaveButton 
-            promptId={id}
-            initialSaved={isSaved}
-            size="sm"
-            onSaveChange={(isSaved) => onSaveToggle?.(id, isSaved)}
-          />
+          {/* Save button (only for authenticated users) */}
+          {session?.user && (
+            <SaveButton 
+              promptId={id}
+              initialSaved={isSaved}
+              size="sm"
+              onSaveChange={(isSaved) => onSaveToggle?.(id, isSaved)}
+            />
+          )}
         </div>
         
         {/* Description */}

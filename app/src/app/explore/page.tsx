@@ -53,7 +53,8 @@ function ExplorePageInner() {
   const searchParams = useSearchParams();
   const query = searchParams.get('q') || '';
   const [searchQuery, setSearchQuery] = useState(query);
-  const [filterMode, setFilterMode] = useState<FilterMode>('followed');
+  // Default to 'all' so guests never start on a protected feed
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -122,6 +123,11 @@ function ExplorePageInner() {
   // Fetch prompts based on filter mode
   useEffect(() => {
     const fetchPrompts = async () => {
+      // Guard: if user not authenticated, never attempt followed feed
+      if (filterMode === 'followed' && status !== 'authenticated') {
+        setFilterMode('all');
+        return;
+      }
       setLoading(true);
       setError('');
       
@@ -218,6 +224,22 @@ function ExplorePageInner() {
       fetchPrompts();
     }
   }, [filterMode, page, categoryFilter, status]);
+
+  // If user is not authenticated and current tab is 'followed', switch to 'all'
+  useEffect(() => {
+    if (status === 'unauthenticated' && filterMode === 'followed') {
+      setFilterMode('all');
+    }
+  }, [status, filterMode]);
+
+  // Auto-switch to 'all' if followed feed is empty or user follows nobody
+  useEffect(() => {
+    if (filterMode === 'followed' && !loading) {
+      if (!followsUsers || prompts.length === 0) {
+        setFilterMode('all');
+      }
+    }
+  }, [filterMode, loading, followsUsers, prompts.length]);
 
   // Update search input and category when URL parameters change
   useEffect(() => {
@@ -321,12 +343,14 @@ function ExplorePageInner() {
         
         {/* Filter tabs */}
         <div className="border-b border-border px-4 flex">
-          <button 
-            onClick={() => handleFilterChange('followed')} 
-            className={`py-2 px-4 font-medium text-sm ${filterMode === 'followed' ? 'text-primary border-b-2 border-primary' : 'text-text-muted'}`}
-          >
-            Following
-          </button>
+          {status === 'authenticated' && (
+            <button 
+              onClick={() => handleFilterChange('followed')} 
+              className={`py-2 px-4 font-medium text-sm ${filterMode === 'followed' ? 'text-primary border-b-2 border-primary' : 'text-text-muted'}`}
+            >
+              Following
+            </button>
+          )}
           <button 
             onClick={() => handleFilterChange('all')} 
             className={`py-2 px-4 font-medium text-sm ${filterMode === 'all' ? 'text-primary border-b-2 border-primary' : 'text-text-muted'}`}

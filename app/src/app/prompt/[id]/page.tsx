@@ -226,13 +226,15 @@ export default function PromptDetail() {
               </h1>
               
               <div className="flex items-center space-x-2">
-                {/* Save button */}
-                <SaveButton 
-                  promptId={promptId}
-                  initialSaved={isSaved}
-                  size="lg"
-                  onSaveChange={handleSaveSuccess}
-                />
+                {/* Save button only if authenticated */}
+                {session?.user && (
+                  <SaveButton 
+                    promptId={promptId}
+                    initialSaved={isSaved}
+                    size="lg"
+                    onSaveChange={handleSaveSuccess}
+                  />
+                )}
                 
                 {/* Edit button (gear icon) - Only visible to the prompt owner */}
                 {session?.user?.id === prompt.userId && (
@@ -371,45 +373,51 @@ export default function PromptDetail() {
         </div>
 
         <h2 className="text-text text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Comments</h2>
-        <div className="flex items-center px-4 py-3 gap-3">
-          <label className="flex flex-col min-w-40 h-full flex-1">
-            <div className="flex w-full flex-1 items-stretch rounded-xl h-full">
-              <div className="flex border border-border bg-background justify-end pl-[15px] pr-[15px] pt-[15px] rounded-l-xl border-r-0">
-                <div className="rounded-full size-10 shrink-0 overflow-hidden border border-border">
-                  <Image
-                    src={session?.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=random`}
-                    alt={session?.user?.name || "User"}
-                    width={40}
-                    height={40}
-                    className="object-cover"
-                    unoptimized
-                  />
+        {session?.user ? (
+          <div className="flex items-center px-4 py-3 gap-3">
+            <label className="flex flex-col min-w-40 h-full flex-1">
+              <div className="flex w-full flex-1 items-stretch rounded-xl h-full">
+                <div className="flex border border-border bg-background justify-end pl-[15px] pr-[15px] pt-[15px] rounded-l-xl border-r-0">
+                  <div className="rounded-full size-10 shrink-0 overflow-hidden border border-border">
+                    <Image
+                      src={session?.user?.image || `https://ui-avatars.com/api/?name=${encodeURIComponent(session?.user?.name || 'User')}&background=random`}
+                      alt={session?.user?.name || "User"}
+                      width={40}
+                      height={40}
+                      className="object-cover"
+                      unoptimized
+                    />
+                  </div>
                 </div>
-              </div>
-              <div className="flex flex-1 flex-col">
-                <textarea 
-                  placeholder={session ? "Add a comment..." : "Sign in to comment"}
-                  value={comment}
-                  onChange={(e) => setComment(e.target.value)}
-                  disabled={!session || submitting}
-                  className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-text focus:outline-0 focus:ring-0 border border-border bg-background focus:border-primary h-auto placeholder:text-text-muted rounded-l-none border-l-0 pl-2 rounded-b-none border-b-0 text-base font-normal leading-normal pt-[22px]"
-                >
-                </textarea>
-                <div className="flex border border-border bg-background justify-end pr-[15px] rounded-br-xl border-l-0 border-t-0 px-[15px] pb-[15px]">
-                  <div className="flex items-center gap-4 justify-end">
-                    <button
-                      onClick={handleCommentSubmit}
-                      disabled={!session || submitting || !comment.trim()}
-                      className="min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-8 px-4 bg-primary text-background text-sm font-medium leading-normal hidden sm:flex disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <span className="truncate">{submitting ? 'Submitting...' : 'Submit'}</span>
-                    </button>
+                <div className="flex flex-1 flex-col">
+                  <textarea 
+                    placeholder="Add a comment..."
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    disabled={submitting}
+                    className="form-input flex w-full min-w-0 flex-1 resize-none overflow-hidden rounded-xl text-text focus:outline-0 focus:ring-0 border border-border bg-background focus:border-primary h-auto placeholder:text-text-muted rounded-l-none border-l-0 pl-2 rounded-b-none border-b-0 text-base font-normal leading-normal pt-[22px]"
+                  >
+                  </textarea>
+                  <div className="flex border border-border bg-background justify-end pr-[15px] rounded-br-xl border-l-0 border-t-0 px-[15px] pb-[15px]">
+                    <div className="flex items-center gap-4 justify-end">
+                      <button
+                        onClick={handleCommentSubmit}
+                        disabled={submitting || !comment.trim()}
+                        className="min-w-[84px] max-w-[480px] cursor-pointer items-center justify-center overflow-hidden rounded-full h-8 px-4 bg-primary text-background text-sm font-medium leading-normal hidden sm:flex disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <span className="truncate">{submitting ? 'Submitting...' : 'Submit'}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </label>
-        </div>
+            </label>
+          </div>
+        ) : (
+          <div className="px-4 py-6 border-b border-border">
+            <p className="text-text-muted text-sm">Sign in to leave a comment. <Link href="/login" className="text-primary underline">Login</Link> or <Link href="/signup" className="text-primary underline">Sign up</Link>.</p>
+          </div>
+        )}
         
         {prompt.comments && prompt.comments.length > 0 ? (
           prompt.comments.map((comment) => (
