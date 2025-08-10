@@ -118,7 +118,7 @@ setup:
 .PHONY: start
 start:
 	@echo "Starting Promptly Docker environment..."
-	@$(DOCKER_COMPOSE) $(DOCKER_COMPOSE_FILE) up --build
+	@$(DOCKER_COMPOSE) $(DOCKER_COMPOSE_FILE) up -d --build
 
 # Health check for running services
 .PHONY: health
