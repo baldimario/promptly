@@ -65,8 +65,13 @@ export const authOptions: NextAuthOptions = {
       if (credentials) return true;
 
       // Auto-link verified Google account to an existing user with same email
-      if (account?.provider === 'google' && profile && (profile as any).email && (profile as any).email_verified) {
+      if (account?.provider && profile && (profile as any).email) {
         const email = (profile as any).email as string;
+        const isGoogle = account.provider === 'google';
+        const isGithub = account.provider === 'github';
+        // Google supplies email_verified, GitHub does not in the basic profile (we assume verified if provided)
+        const emailVerified = isGoogle ? !!(profile as any).email_verified : isGithub ? true : false;
+        if (!emailVerified) return !!user?.email; // abort auto-link if not verified
         try {
           const existingUser = await prisma.user.findUnique({ where: { email } });
           if (existingUser) {
