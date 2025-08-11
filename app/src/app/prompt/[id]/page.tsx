@@ -16,6 +16,7 @@ import { formatRelativeTime } from '@/utils/dateFormat';
 import { ratePrompt, commentOnPrompt } from '@/utils/promptActions';
 
 import { Prompt, Comment } from '@/types/prompt';
+import MarkdownViewer from '@/components/common/MarkdownViewer';
 
 export default function PromptDetail() {
   const { data: session } = useSession();
@@ -297,40 +298,65 @@ export default function PromptDetail() {
           </div>
         </div>
 
-        <h2 className="text-text text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Prompt</h2>
-        <p className="text-text text-base font-normal leading-normal pb-3 pt-1 px-4 whitespace-pre-wrap">
-          {prompt.promptText}
-        </p>
+        <h2 className="text-text text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5 flex items-center gap-3">Prompt
+          <button
+            onClick={() => navigator.clipboard.writeText(prompt.promptText)}
+            className="text-xs ml-2 px-2 py-1 rounded-md border border-border hover:border-primary hover:text-primary transition-colors"
+            title="Copy prompt text"
+          >Copy</button>
+        </h2>
+        <div className="px-4 pb-3 pt-1">
+          <div className="border border-border rounded-lg p-4 bg-background/60 overflow-x-auto">
+            <MarkdownViewer value={prompt.promptText} />
+          </div>
+        </div>
 
         <h2 className="text-text text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Suggested Model</h2>
         <p className="text-text text-base font-normal leading-normal pb-3 pt-1 px-4">
           {prompt.suggestedModel}
         </p>
 
-        <h2 className="text-text text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Example Output</h2>
         {prompt.exampleOutputs && (
-          <p className="text-text text-base font-normal leading-normal pb-3 pt-1 px-4 whitespace-pre-wrap">
-            {prompt.exampleOutputs}
-          </p>
+          <>
+            <h2 className="text-text text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5 flex items-center gap-3">Example Output
+              <button
+                onClick={() => navigator.clipboard.writeText(prompt.exampleOutputs || '')}
+                className="text-xs ml-2 px-2 py-1 rounded-md border border-border hover:border-primary hover:text-primary transition-colors"
+                title="Copy example output"
+              >Copy</button>
+            </h2>
+            <div className="px-4 pb-3 pt-1">
+              <div className="border border-border rounded-lg p-4 bg-background/60 overflow-x-auto">
+                <MarkdownViewer value={prompt.exampleOutputs} />
+              </div>
+            </div>
+          </>
         )}
         
-        {/* Display output images if available */}
-        {prompt.imageUrls && prompt.imageUrls.length > 0 && (
-          <div className="px-4 py-3">
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-              {prompt.imageUrls.map((imageUrl, index) => (
-                <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-border">
-                  <Image 
-                    src={imageUrl} 
-                    alt={`Example output ${index + 1}`} 
-                    fill
-                    className="object-cover"
-                  />
-                </div>
-              ))}
+        {/* Display output images if valid (filter out null/empty) */}
+        {(() => {
+          // Only treat genuinely uploaded images (stored under /uploads/images/) as example output images.
+          const validImageUrls = (prompt.imageUrls || []).filter(
+            (u): u is string => !!u && typeof u === 'string' && u.startsWith('/uploads/images/')
+          );
+          if (validImageUrls.length === 0) return null;
+          return (
+            <div className="px-4 py-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                {validImageUrls.map((imageUrl, index) => (
+                  <div key={index} className="relative aspect-square rounded-lg overflow-hidden border border-border">
+                    <Image
+                      src={imageUrl}
+                      alt={`Example output ${index + 1}`}
+                      fill
+                      className="object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <h2 className="text-text text-[22px] font-bold leading-tight tracking-[-0.015em] px-4 pb-3 pt-5">Ratings</h2>
         <div className="flex flex-wrap gap-x-8 gap-y-6 p-4">
